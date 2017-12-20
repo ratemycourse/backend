@@ -13,16 +13,33 @@ const connection = mysql.createConnection({
 connection.connect();
 
 app.use((req, res, next) => {
+
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Content-Type', 'application/xml');
   next();
 });
 
 app.get('/', (req, res) => {
   connection.query('SELECT * FROM dd', (err, result) => {
     if (err) { console.log(err); }
-    console.log(result);
-    res.json(result);
+    const data = '<courses>' + result.map((row) => {
+      return (
+        xml({
+          course: [
+            {
+              _attr: { code: row.code },
+            },
+            {title: row.title},
+            {info: row.info},
+            {href: row.href},
+            {score: row.score},
+          ],
+        })
+      );
+    }).join('') + '</courses>';
+    console.log(data);
+    res.send(data);
   });
 });
 
