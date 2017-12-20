@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express();
 const mysql = require('mysql');
+const xml = require('xml')
 
 const connection = mysql.createConnection({
   host: 'localhost',
