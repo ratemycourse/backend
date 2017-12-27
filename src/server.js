@@ -2,6 +2,8 @@ const express = require('express');
 const app = express();
 const mysql = require('mysql');
 const xml = require('xml');
+const path = require('path');
+const request = require('request-promise');
 
 const connection = mysql.createConnection({
   host: 'localhost',
@@ -10,20 +12,22 @@ const connection = mysql.createConnection({
   database: 'ratemycourseDB',
 });
 
-connection.connect();
+
 
 app.use((req, res, next) => {
-
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.header('Content-Type', 'application/xml');
   next();
 });
 
-app.get('/', (req, res) => {
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/courses', (req, res) => {
+  connection.connect();
   connection.query('SELECT * FROM dd', (err, result) => {
     if (err) { console.log(err); }
-    const data = '<courses>' + result.map((row) => {
+    const data = result.map((row) => {
       return (
         xml({
           course: [
@@ -38,7 +42,51 @@ app.get('/', (req, res) => {
         })
       );
     }).join('') + '</courses>';
-    console.log(data);
+    res.send(data);
+    connection.end();
+  });
+});
+
+app.get('/kthapi/courses/:depID', (req, res) => {
+  const requestURL = `https://www.kth.se/api/kopps/v2/courses/${ req.params.depID }.json`;
+  console.log(req.params);
+  console.log(requestURL);
+  request(requestURL).then((response) => {
+    const fetched = JSON.parse(response);
+    const header = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>';
+    const data = header + '<courses>' + fetched.courses.map((course) => {
+      return (
+        xml({
+          course: [
+            {
+              _attr: { code: course.code },
+            },
+            {title: course.title},
+            {info: course.info},
+            {href: course.href},
+          ],
+        })
+      );
+    }).join('') + '</courses>';
+    res.send(data);
+  });
+});
+
+app.get('/kthapi/departments', (req, res) => {
+  const requestURL = 'https://www.kth.se/api/kopps/v2/departments.sv.json';
+  request(requestURL).then((response) => {
+    const fetched = JSON.parse(response);
+    const data = '<departments>' + fetched.map((department) => {
+      return (
+        xml({
+          department: [
+            {code: department.code},
+            {name: department.name},
+            {href: `/kthapi/courses/${ department.code }`},
+          ],
+        })
+      );
+    }).join('') + '</departments>';
     res.send(data);
   });
 });
