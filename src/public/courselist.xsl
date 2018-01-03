@@ -9,8 +9,11 @@
           <xsl:attribute name="href">
              <xsl:value-of select="./href"/>
           </xsl:attribute>
-          <xsl:value-of select="./title"/>
+          <xsl:value-of select="./name"/>
         </a>
+      </h2>
+      <h2>
+        <xsl:value-of select="./department" />
       </h2>
       <xsl:apply-templates select="info"/>
   </xsl:template>
