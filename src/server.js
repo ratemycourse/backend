@@ -32,6 +32,13 @@ async function getAllCourses(array) {
   return true;
 }
 
+const getCourse = (courseID) => {
+  const requestURL = `https://www.kth.se/api/kopps/v2/course/${ courseID }`;
+  return request(requestURL).then((response) => {
+    return response;
+  });
+};
+
 // Get all departmentcodes for loading courses from KTHs course API.
 async function buildDB() {
   console.log('STARTING UPDATE!');
@@ -64,8 +71,13 @@ app.get('/buildDB', (req, res) => {
   update();
 });
 
-app.get('/courses', (req, res) => {
-  connection.query('SELECT * FROM course', (err, result) => {
+app.get('/search/query', (req, res) => {
+  let SQLquery = `SELECT * FROM course WHERE ( code LIKE '%${ req.query.srchstr }%' OR name LIKE '%${ req.query.srchstr }%') AND depcode IN (${ req.query.dep })`;
+  if (req.query.srchstr === 'empty') {
+    SQLquery = `SELECT * FROM course WHERE depcode IN (${ req.query.dep })`;
+  }
+  console.log(SQLquery);
+  connection.query(SQLquery, (err, result) => {
     if (err) { console.log(err); }
     const data = '<courses>' + result.map((row) => {
       return (
@@ -83,62 +95,6 @@ app.get('/courses', (req, res) => {
       );
     }).join('') + '</courses>';
     res.send(data);
-  });
-});
-
-app.get('/search/query', (req, res) => {
-  let SQLquery = `SELECT * FROM course WHERE ( code LIKE '%${ req.query.srchstr }%' OR name LIKE '%${ req.query.srchstr }%') AND depcode IN (${ req.query.dep })`;
-  if (req.query.srchstr === 'empty') {
-    SQLquery = `SELECT * FROM course WHERE depcode IN (${ req.query.dep })`;
-  }
-  console.log(SQLquery);
-  connection.query(SQLquery, (err, result) => {
-    if (err) { console.log(err); }
-    const data = '<courses>' + result.map((row) => {  
-      return (
-        xml({
-          course: [
-            {
-              _attr: { code: row.code },
-            },
-            {name: row.name},
-            {href: row.href},
-            {score: row.score},
-            {department: row.depcode},
-          ],
-        })
-      );
-    }).join('') + '</courses>';
-    res.send(data);
-  });
-});
-
-const getCourses = (depID) => {
-  const requestURL = `https://www.kth.se/api/kopps/v2/courses/${ depID }.json`;
-  return request(requestURL).then((response) => {
-    const fetched = JSON.parse(response);
-    const header = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>';
-    const data = header + '<courses>' + fetched.courses.map((course) => {
-      return (
-        xml({
-          course: [
-            {
-              _attr: { code: course.code },
-            },
-            {title: course.title},
-            {info: course.info},
-            {href: course.href},
-          ],
-        })
-      );
-    }).join('') + '</courses>';
-    return (data);
-  });
-};
-
-app.get('/kthapi/courses/:depID', (req, res) => {
-  getCourses(req.params.depID).then((response) => {
-    res.send(response);
   });
 });
 
