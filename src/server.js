@@ -98,6 +98,26 @@ app.get('/search/query', (req, res) => {
   });
 });
 
+app.get('/user/validate', (req, res) => {
+  const SQLquery = `SELECT * FROM user WHERE ( name = ${ req.query.user } OR email = ${ req.query.user } ) AND password = BINARY ${ req.query.pass }`;
+  console.log(SQLquery);
+  connection.query(SQLquery, (err, result) => {
+    if (err) { console.log(err); }
+    console.log(result.length);
+    if (result.length > 0) {
+      res.json({
+        reply: true,
+        data: result[0],
+      });
+    } else {
+      res.json({
+        reply: false,
+        data: {},
+      });
+    }
+  });
+});
+
 app.get('/kthapi/departments', (req, res) => {
   const requestURL = 'https://www.kth.se/api/kopps/v2/departments.sv.json';
   request(requestURL).then((response) => {
