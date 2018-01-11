@@ -32,13 +32,6 @@ async function getAllCourses(array) {
   return true;
 }
 
-const getCourse = (courseID) => {
-  const requestURL = `https://www.kth.se/api/kopps/v2/course/${ courseID }`;
-  return request(requestURL).then((response) => {
-    return response;
-  });
-};
-
 // Get all departmentcodes for loading courses from KTHs course API.
 async function buildDB() {
   console.log('STARTING UPDATE!');
@@ -72,6 +65,7 @@ app.get('/buildDB', (req, res) => {
 });
 
 app.get('/search/query', (req, res) => {
+  const noRating = 'No rating';
   let SQLquery = `SELECT * FROM course WHERE ( code LIKE '%${ req.query.srchstr }%' OR name LIKE '%${ req.query.srchstr }%') AND depcode IN (${ req.query.dep })`;
   if (req.query.srchstr === 'empty') {
     SQLquery = `SELECT * FROM course WHERE depcode IN (${ req.query.dep })`;
@@ -90,6 +84,7 @@ app.get('/search/query', (req, res) => {
             {href: row.href},
             {score: row.score},
             {department: row.depcode},
+            {rating: row.rating},
           ],
         })
       );
@@ -98,12 +93,15 @@ app.get('/search/query', (req, res) => {
   });
 });
 
-app.get('/user/validate', (req, res) => {
-  const SQLquery = `SELECT * FROM user WHERE ( name = ${ req.query.user } OR email = ${ req.query.user } ) AND password = BINARY ${ req.query.pass }`;
+const jsonParser = bodyParser.json();
+
+app.post('/user/validate', jsonParser, (req, res) => {
+  const SQLquery = `SELECT * FROM user WHERE ( name = '${ req.body.user }' 
+                    OR email = '${ req.body.user }' ) 
+                    AND password = BINARY '${ req.body.password }'`;
   console.log(SQLquery);
   connection.query(SQLquery, (err, result) => {
     if (err) { console.log(err); }
-    console.log(result.length);
     if (result.length > 0) {
       res.json({
         reply: true,
