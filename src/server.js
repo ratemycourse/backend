@@ -84,7 +84,7 @@ app.get('/search/query', (req, res) => {
             {href: row.href},
             {score: row.score},
             {department: row.depcode},
-            {rating: row.rating},
+            {rating: row.rating ? (row.rating) : (noRating)},
           ],
         })
       );
