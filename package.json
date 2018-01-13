@@ -12,7 +12,8 @@
     "xml": "^1.0.1"
   },
   "devDependencies": {
-    "eslint": "^4.12.1"
+    "eslint": "^4.12.1",
+    "nodemon": "^1.14.11"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

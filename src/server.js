@@ -72,23 +72,51 @@ app.get('/search/query', (req, res) => {
   }
   console.log(SQLquery);
   connection.query(SQLquery, (err, result) => {
+    console.log(result);
     if (err) { console.log(err); }
-    const data = '<courses>' + result.map((row) => {
+    const data = '<courses>' + (result.length > 0 ? (result.map((row) => {
       return (
         xml({
           course: [
             {
               _attr: { code: row.code },
             },
-            {name: row.name},
-            {href: row.href},
-            {score: row.score},
-            {department: row.depcode},
-            {rating: row.rating ? (row.rating) : (noRating)},
+            { name: row.name },
+            { href: row.href },
+            { department: row.depcode },
+            { rating: row.score ? (row.rating) : (noRating) },
           ],
         })
       );
-    }).join('') + '</courses>';
+    }).join('')) : ('<nofound>No courses found</nofound>')) + '</courses>';
+    res.send(data);
+  });
+});
+
+app.get('/course/:courseCode', async (req, res) => {
+  const noRating = 'No rating';
+  const requestURL = `https://www.kth.se/api/kopps/v2/course/${ req.params.courseCode }`;
+  const SQLquery = `SELECT * FROM course WHERE code = '${ req.params.courseCode }'`;
+  const apidata = await request(requestURL).then((response) => { return JSON.parse(response); });
+
+  connection.query(SQLquery, (err, result) => {
+    if (err) { console.log(err); }
+    const data = result.map((row) => {
+      return (
+        xml({
+          course: [
+            { name: row.name },
+            { code: row.code },
+            { href: apidata.href.sv },
+            { courseWebUrl: apidata.courseWebUrl.sv },
+            { info: apidata.info.sv ? (apidata.info.sv) : ('No info found...') },
+            { level: apidata.level.sv },
+            { score: row.score ? (row.score) : (noRating) },
+            { comments: row.comments },
+          ],
+        })
+      );
+    }).join('');
     res.send(data);
   });
 });
@@ -103,6 +131,7 @@ app.post('/user/validate', jsonParser, (req, res) => {
   connection.query(SQLquery, (err, result) => {
     if (err) { console.log(err); }
     if (result.length > 0) {
+      console.log(result[0]);
       res.json({
         reply: true,
         data: result[0],
@@ -113,6 +142,15 @@ app.post('/user/validate', jsonParser, (req, res) => {
         data: {},
       });
     }
+  });
+});
+
+app.post('user/submitscore', jsonParser, (req, res) => {
+  const SQLquery = `INSERT INTO scores (user_id, course_code, score_given) 
+                    VALUES (${ req.body.userID }, '${ req.body.courseCode }', ${ req.body.score })`;
+  connection.query(SQLquery, (err, result) => {
+    if (err) { console.log(err); }
+    res.send(req.body.score);
   });
 });
 
