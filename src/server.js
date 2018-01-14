@@ -82,7 +82,7 @@ app.get('/search/query', (req, res) => {
             { name: row.name },
             { href: row.href },
             { department: row.depcode },
-            { rating: row.score ? (row.rating) : (noRating) },
+            { score: row.score ? (row.score) : (noRating) },
           ],
         })
       );
@@ -109,29 +109,54 @@ app.get('/course/:courseCode', async (req, res) => {
             { courseWebUrl: apidata.courseWebUrl.sv },
             { info: apidata.info.sv ? (apidata.info.sv) : ('No info found...') },
             { level: apidata.level.sv },
-            { score: row.score ? (row.score) : (noRating) },
+            { score: 3.5 /* row.score ? (row.score) : (noRating) */ },
             { comments: row.comments },
           ],
         })
       );
     }).join('');
     res.send(data);
-  });
+  }); 
 });
 
 const jsonParser = bodyParser.json();
 
 app.post('/user/validate', jsonParser, (req, res) => {
-  const SQLquery = `SELECT * FROM user WHERE ( name = '${ req.body.user }' 
-                    OR email = '${ req.body.user }' ) 
-                    AND password = BINARY '${ req.body.password }'`;
+  const SQLquery = `SELECT user.user_id, name, email, scores.course_code, score_given, course_comment.coursecomment_id FROM user 
+                      LEFT JOIN scores ON user.user_id = scores.user_id
+                      LEFT JOIN course_comment ON user.user_id = course_comment.user_id
+                      LEFT JOIN comment ON course_comment.coursecomment_id = comment.comment_id
+                        WHERE ( name = '${ req.body.user }'
+                        OR email = '${ req.body.user }' )
+                        AND password = BINARY '${ req.body.password }';`;
+  console.log(SQLquery);
   connection.query(SQLquery, (err, result) => {
     if (err) { console.log(err); }
     if (result.length > 0) {
-      console.log('LOG IN RES: ', result[0]);
+      const scoreSeen = [];
+      const commentSeen = [];
+      const userScoresGiven = {};
+      const userComments = [];
+      for (const row of result) {
+        if (!scoreSeen.includes(row.course_code) && row.course_code !== null) {
+          userScoresGiven[row.course_code] = row.score_given;
+          scoreSeen.push(row.course_code);
+        }
+        if (!commentSeen.includes(row.coursecomment_id) && row.coursecomment_id !== null) {
+          userComments.push(row.coursecomment_id);
+          commentSeen.push(row.coursecomment_id);
+        }
+      }
+      const data = {
+        userId: result[0].user_id,
+        userName: result[0].name,
+        userEmail: result[0].email,
+        userScoresGiven: userScoresGiven,
+        userComments: userComments,
+      };
       res.json({
         reply: true,
-        data: result[0],
+        data: data,
       });
     } else {
       res.json({
@@ -142,12 +167,13 @@ app.post('/user/validate', jsonParser, (req, res) => {
   });
 });
 
-app.post('user/submitscore', jsonParser, (req, res) => {
-  const SQLquery = `INSERT INTO scores (user_id, course_code, score_given) 
+app.post('/user/submitscore', jsonParser, (req, res) => {
+  console.log(req.body);
+  const SQLquery = `REPLACE INTO scores (user_id, course_code, score_given) 
                     VALUES (${ req.body.userID }, '${ req.body.courseCode }', ${ req.body.score })`;
   connection.query(SQLquery, (err, result) => {
     if (err) { console.log(err); }
-    res.send(req.body.score);
+    res.send({ courseCode: req.body.courseCode, userScore: req.body.score });
   });
 });
 
