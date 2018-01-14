@@ -70,9 +70,7 @@ app.get('/search/query', (req, res) => {
   if (req.query.srchstr === 'empty') {
     SQLquery = `SELECT * FROM course WHERE depcode IN (${ req.query.dep })`;
   }
-  console.log(SQLquery);
   connection.query(SQLquery, (err, result) => {
-    console.log(result);
     if (err) { console.log(err); }
     const data = '<courses>' + (result.length > 0 ? (result.map((row) => {
       return (
@@ -184,6 +182,119 @@ app.get('/kthapi/departments', (req, res) => {
   request(requestURL).then((response) => {
     res.json(response);
   });
+});
+
+// --
+
+function alphanum(inputtxt) {
+  const letterNumber = /^[0-9a-zA-Z]+$/;
+  if (inputtxt.match(letterNumber)) {
+    return true;
+  }
+  return false;
+}
+
+function getSQLerrorMsg(SQLerror, name, email) {
+  const errorMessage = SQLerror.sqlMessage;
+  let errorMsg = 'no SQL-error';
+  if (errorMessage.includes('email_UNIQUE')) {
+    errorMsg = 'Another user is already registred with the email ' + email;
+  } else if (errorMessage.includes('email_INVALID')) {
+    errorMsg = email + ' is not a KTH-e-mail adress!';
+  } else if (errorMessage.includes('email_TOO_SHORT')) {
+    errorMsg = email + ' is not a valid e-mail adress';
+  } else if (errorMessage.includes('name_UNIQUE')) {
+    errorMsg = 'the user name ' + name + ' is already taken!';
+  } else if (errorMessage.includes('name_TOO_SHORT') || errorMessage.includes('name_TOO_LONG')) {
+    errorMsg = 'Your user name must be between 3 and 25 characters!';
+  } else if (errorMessage.includes('password_UNIQUE')) {
+    errorMsg = ' your password is too short!';
+  } console.log(errorMsg);
+  return errorMsg;
+}
+
+// TO DO : response.send() skicka felmeddelanden till front-end
+app.post('/user/reguser', jsonParser, (req, res) => {
+  const name = req.body.newUser;
+  const email = req.body.newEmail;
+  const pass1 = req.body.newPassword1;
+  const pass2 = req.body.newPassword2;
+  if (name === 'PURGE') { // REMOVE THIS STATEMENT AFTER DEVELOPMENT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    let SQLpurge = 'DELETE FROM user WHERE user_id > 0';
+    connection.query(SQLpurge);
+    SQLpurge = 'SELECT * FROM user';
+    connection.query(SQLpurge, (er, rs) => {
+      if (er) {
+        console.log(er);
+      } else {
+        console.log('-------user table: ', rs);
+      }
+    });
+    console.log('table user purged');
+  } else if (name === 'SELECT') { // REMOVE THIS STATEMENT AFTER DEVELOPMENT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    const SQLselect = 'SELECT * FROM user';
+    connection.query(SQLselect, (er, rs) => {
+      if (er) {
+        console.log(er);
+      } else {
+        console.log('-------user table: ', rs);
+      }
+    });
+    console.log('table user purged');
+  } else if (alphanum(name) === false) {
+    console.log('Your nick name can only contain letters and digits between A-Z / 0-9');
+  } else if (pass1 !== pass2) {
+    console.log('Password fields doesn\'t match');
+    console.log('   Password1', pass1);
+    console.log('   Password2', pass2);
+  } else {
+    // försöker skriva till SQL-db
+    const SQLregister = `INSERT INTO user (name, email, password) VALUES ('${ name }', '${ email }', '${ pass1 }');`;
+    connection.query(SQLregister, (error) => {
+      if (error) {
+        // SQL gav ett error
+        const errorMsg = getSQLerrorMsg(error, name, email);
+        res.json({
+          reply: false,
+          data: {errorMsg: errorMsg},
+        });
+      } else {
+        const SQLgetID = 'SELECT LAST_INSERT_ID()';
+        connection.query(SQLgetID, (getIDerr, getIDres) => {
+          if (getIDerr) {
+            const getIDerrMsg = getIDerr.sqlMessage;
+            res.json({
+              reply: false,
+              data: {errorMessage: getIDerrMsg},
+            });
+          } else {
+            const userID = parseInt(JSON.stringify(getIDres[0]).replace(/\D/g, ''), 10);
+            const SQLgetData = `SELECT * FROM user WHERE user_id = ${ userID }`;
+
+            connection.query(SQLgetData, (getDataErr, resultData) => {
+              if (getDataErr) {
+                console.log('ERROR getting data from database!');
+              } else {
+                res.json({
+                  reply: true,
+                  data: resultData[0],
+                });
+                console.log('(¯`·._.·(¯`·._.· Register success! ·._.·´¯)·._.·´¯) ');
+                /* console.log('   Name', name);
+                console.log('   E-mail', email);
+                console.log('   Password1', pass1);
+                console.log('   Password2', pass2);
+                console.log('   userID', userID);
+                const ciphertext = CryptoJS.AES.encrypt(pass1, 'secret key 123'); // chiper
+                const bytes = CryptoJS.AES.decrypt(ciphertext.toString(), 'secret key 123'); // conv to hex
+                const plaintext = bytes.toString(CryptoJS.enc.Utf8);  // dechiper */
+              }
+            });
+          }
+        });
+      }
+    });
+  }
 });
 
 app.listen(3000, () => console.log('server API listening on port 3000!'));
