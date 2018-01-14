@@ -39,7 +39,7 @@
           <div class="avgRatingContainer d-flex float-right d-inline-block bg-tetriary rounded p-2 m-2 text-white">
             AVERAGE RATING: &#160;
             <div class="avgRating font-weight-bold">
-              <xsl:value-of select="./rating"/>
+              <xsl:value-of select="./score"/>
             </div>
           </div>
         </div>
