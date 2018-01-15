@@ -197,18 +197,18 @@ function alphanum(inputtxt) {
 function getSQLerrorMsg(SQLerror, name, email) {
   const errorMessage = SQLerror.sqlMessage;
   let errorMsg = 'no SQL-error';
-  if (errorMessage.includes('email_UNIQUE')) {
+  if (errorMessage.includes('name_UNIQUE')) {
+    errorMsg = 'The user name ' + name + ' is already taken!';
+  } else if (errorMessage.includes('name_TOO_SHORT') || errorMessage.includes('name_TOO_LONG')) {
+    errorMsg = 'Your user name must be between 3 and 25 characters!';
+  } else if (errorMessage.includes('email_UNIQUE')) {
     errorMsg = 'Another user is already registred with the email ' + email;
   } else if (errorMessage.includes('email_INVALID')) {
     errorMsg = email + ' is not a KTH-e-mail adress!';
   } else if (errorMessage.includes('email_TOO_SHORT')) {
     errorMsg = email + ' is not a valid e-mail adress';
-  } else if (errorMessage.includes('name_UNIQUE')) {
-    errorMsg = 'the user name ' + name + ' is already taken!';
-  } else if (errorMessage.includes('name_TOO_SHORT') || errorMessage.includes('name_TOO_LONG')) {
-    errorMsg = 'Your user name must be between 3 and 25 characters!';
-  } else if (errorMessage.includes('password_UNIQUE')) {
-    errorMsg = ' your password is too short!';
+  } else if (errorMessage.includes('password_TOO_SHORT')) {
+    errorMsg = 'Your password has to be atleast 6 characters!';
   } console.log(errorMsg);
   return errorMsg;
 }
@@ -242,11 +242,17 @@ app.post('/user/reguser', jsonParser, (req, res) => {
     });
     console.log('table user purged');
   } else if (alphanum(name) === false) {
-    console.log('Your nick name can only contain letters and digits between A-Z / 0-9');
+    res.json({
+      reply: false,
+      data: null,
+      error: 'Your nick name can only contain letters and digits between A-Z / 0-9',
+    });
   } else if (pass1 !== pass2) {
-    console.log('Password fields doesn\'t match');
-    console.log('   Password1', pass1);
-    console.log('   Password2', pass2);
+    res.json({
+      reply: false,
+      data: null,
+      error: 'Password fields doesn\'t match',
+    });
   } else {
     // försöker skriva till SQL-db
     const SQLregister = `INSERT INTO user (name, email, password) VALUES ('${ name }', '${ email }', '${ pass1 }');`;
@@ -256,7 +262,8 @@ app.post('/user/reguser', jsonParser, (req, res) => {
         const errorMsg = getSQLerrorMsg(error, name, email);
         res.json({
           reply: false,
-          data: {errorMsg: errorMsg},
+          data: null,
+          error: errorMsg,
         });
       } else {
         const SQLgetID = 'SELECT LAST_INSERT_ID()';
@@ -265,7 +272,8 @@ app.post('/user/reguser', jsonParser, (req, res) => {
             const getIDerrMsg = getIDerr.sqlMessage;
             res.json({
               reply: false,
-              data: {errorMessage: getIDerrMsg},
+              data: null,
+              error: getIDerrMsg,
             });
           } else {
             const userID = parseInt(JSON.stringify(getIDres[0]).replace(/\D/g, ''), 10);
@@ -278,6 +286,7 @@ app.post('/user/reguser', jsonParser, (req, res) => {
                 res.json({
                   reply: true,
                   data: resultData[0],
+                  error: null,
                 });
                 console.log('(¯`·._.·(¯`·._.· Register success! ·._.·´¯)·._.·´¯) ');
                 /* console.log('   Name', name);
