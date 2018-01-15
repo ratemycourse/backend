@@ -70,6 +70,7 @@ app.get('/search/query', (req, res) => {
   if (req.query.srchstr === 'empty') {
     SQLquery = `SELECT * FROM course WHERE depcode IN (${ req.query.dep })`;
   }
+  console.log(SQLquery);
   connection.query(SQLquery, (err, result) => {
     if (err) { console.log(err); }
     const data = '<courses>' + (result.length > 0 ? (result.map((row) => {
@@ -275,9 +276,30 @@ app.post('/user/reguser', jsonParser, (req, res) => {
               if (getDataErr) {
                 console.log('ERROR getting data from database!');
               } else {
+                const scoreSeen = [];
+                const commentSeen = [];
+                const userScoresGiven = {};
+                const userComments = [];
+                for (const row of resultData) {
+                  if (!scoreSeen.includes(row.course_code) && row.course_code !== null) {
+                    userScoresGiven[row.course_code] = row.score_given;
+                    scoreSeen.push(row.course_code);
+                  }
+                  if (!commentSeen.includes(row.coursecomment_id) && row.coursecomment_id !== null) {
+                    userComments.push(row.coursecomment_id);
+                    commentSeen.push(row.coursecomment_id);
+                  }
+                }
+                const data = {
+                  userId: resultData[0].user_id,
+                  userName: resultData[0].name,
+                  userEmail: resultData[0].email,
+                  userScoresGiven: userScoresGiven,
+                  userComments: userComments,
+                };
                 res.json({
                   reply: true,
-                  data: resultData[0],
+                  data: data,
                 });
                 console.log('(¯`·._.·(¯`·._.· Register success! ·._.·´¯)·._.·´¯) ');
                 /* console.log('   Name', name);
