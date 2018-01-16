@@ -32,15 +32,15 @@
         </h2>
       </div>
       <div class="card-body m-0 p-0">
-        <div id="starRating">
-          <div class="rating float-left">
-            error loading rating bar
-          </div>
-          <div class="avgRatingContainer d-flex float-right d-inline-block bg-tetriary rounded p-2 m-2 text-white">
-            AVERAGE RATING: &#160;
-            <div class="avgRating font-weight-bold">
-              <xsl:value-of select="./score"/>
+        <div class="d-flex">
+          <div class="d-flex align-items-center ml-auto d-inline-block bg-primary rounded p-2 m-2 text-white ">
+            <div class="avgRating m">
+              <xsl:attribute name="score">
+                <xsl:value-of select="./score"/>
+              </xsl:attribute>
+              Average score didn't load...
             </div>
+            <h2 class="m-auto pl-2"><xsl:value-of select="./score" /></h2>
           </div>
         </div>
       </div>

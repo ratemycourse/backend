@@ -95,29 +95,37 @@ app.get('/search/query', (req, res) => {
 app.get('/course/:courseCode', async (req, res) => {
   const noRating = 'No rating';
   const requestURL = `https://www.kth.se/api/kopps/v2/course/${ req.params.courseCode }`;
-  const SQLquery = `SELECT * FROM course WHERE code = '${ req.params.courseCode }'`;
+
+  const SQLquery = `SELECT code, name, score, coursecomment_id, user_id, text, timeCreated FROM course 
+                      LEFT JOIN course_comment ON course.code = course_comment.course_code
+                      LEFT JOIN comment ON course_comment.coursecomment_id = comment.comment_id
+                        WHERE code = '${ req.params.courseCode }'`;
   const apidata = await request(requestURL).then((response) => { return JSON.parse(response); });
 
   connection.query(SQLquery, (err, result) => {
     if (err) { console.log(err); }
-    const data = result.map((row) => {
-      return (
+    const commentsSeen = [];
+    const comments = [];
+    for (const row of result) {
+      if (!commentsSeen.includes(row.coursecomment_id)) {
+        comments.push({ comment: [{ commentId: row.coursecomment_id }, { userID: row.user_id }, { commentText: row.text }] });
+      }
+    }
+    const data =
         xml({
           course: [
-            { name: row.name },
-            { code: row.code },
-            { href: apidata.href.sv },
-            { courseWebUrl: apidata.courseWebUrl.sv },
-            { info: apidata.info.sv ? (apidata.info.sv) : ('No info found...') },
-            { level: apidata.level.sv },
-            { score: 3.5 /* row.score ? (row.score) : (noRating) */ },
-            { comments: row.comments },
+            { name: result[0].name },
+            { code: result[0].code },
+            // { href: apidata.href.sv },
+            // { courseWebUrl: apidata.courseWebUrl.sv },
+            // { info: apidata.info.sv ? (apidata.info.sv) : ('No info found...') },
+            // { level: apidata.level.sv },
+            { score: result[0].score ? (result[0].score) : (noRating) },
+            { comments: comments },
           ],
-        })
-      );
-    }).join('');
+        });
     res.send(data);
-  }); 
+  });
 });
 
 const jsonParser = bodyParser.json();
