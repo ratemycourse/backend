@@ -11,6 +11,7 @@ const connection = mysql.createConnection({
   user: 'test',
   password: 'cocacola',
   database: 'ratemycoursedb',
+  multipleStatements: true,
 });
 
 connection.connect();
@@ -66,7 +67,13 @@ app.get('/buildDB', (req, res) => {
 
 app.get('/search/query', (req, res) => {
   const noRating = 'No rating';
-  let SQLquery = `SELECT * FROM course WHERE ( code LIKE '%${ req.query.srchstr }%' OR name LIKE '%${ req.query.srchstr }%') AND depcode IN (${ req.query.dep })`;
+  let SQLquery = `SELECT code, name, score, href, depcode, count(coursecomment_id) as sumComments FROM course
+                  LEFT JOIN course_comment ON course.code = course_comment.course_code
+                     WHERE ( code LIKE '%${ req.query.srchstr }%' 
+                     OR name LIKE '%${ req.query.srchstr }%') 
+                     AND depcode IN (${ req.query.dep })
+                     GROUP BY code`;
+
   if (req.query.srchstr === 'empty') {
     SQLquery = `SELECT * FROM course WHERE depcode IN (${ req.query.dep })`;
   }
@@ -84,6 +91,7 @@ app.get('/search/query', (req, res) => {
             { href: row.href },
             { department: row.depcode },
             { score: row.score ? (row.score) : (noRating) },
+            { sumComments: row.sumComments },
           ],
         })
       );
@@ -96,19 +104,29 @@ app.get('/course/:courseCode', async (req, res) => {
   const noRating = 'No rating';
   const requestURL = `https://www.kth.se/api/kopps/v2/course/${ req.params.courseCode }`;
 
-  const SQLquery = `SELECT code, name, score, coursecomment_id, user_id, text, timeCreated FROM course 
+  const SQLquery = `SELECT code, course.name, score, coursecomment_id, user.name as userName, user.user_id, text, timeCreated FROM course 
                       LEFT JOIN course_comment ON course.code = course_comment.course_code
                       LEFT JOIN comment ON course_comment.coursecomment_id = comment.comment_id
-                        WHERE code = '${ req.params.courseCode }'`;
-  const apidata = await request(requestURL).then((response) => { return JSON.parse(response); });
+                      LEFT JOIN user ON course_comment.user_id = user.user_id
+                        WHERE code = '${ req.params.courseCode }'
+                      ORDER BY timeCreated DESC`;
+
+  const apidata = await request(requestURL).then((response) => { return JSON.parse(response); })
+      .catch((error) => error.toString());
 
   connection.query(SQLquery, (err, result) => {
     if (err) { console.log(err); }
     const commentsSeen = [];
     const comments = [];
-    for (const row of result) {
+    for (const row of result) { 
       if (!commentsSeen.includes(row.coursecomment_id)) {
-        comments.push({ comment: [{ commentId: row.coursecomment_id }, { userID: row.user_id }, { commentText: row.text }] });
+        comments.push({ comment: [
+          { commentId: row.coursecomment_id },
+          { userID: row.user_id },
+          { userName: row.userName },
+          { commentText: row.text },
+          row.timeCreated ? { timeCreated: `${ row.timeCreated.getFullYear() }/${ row.timeCreated.getMonth() + 1 }/${ row.timeCreated.getDate() + 1 } - ${ row.timeCreated.getHours() }:${ row.timeCreated.getMinutes() }` } : (false),
+        ]});
       }
     }
     const data =
@@ -116,10 +134,10 @@ app.get('/course/:courseCode', async (req, res) => {
           course: [
             { name: result[0].name },
             { code: result[0].code },
-            // { href: apidata.href.sv },
-            // { courseWebUrl: apidata.courseWebUrl.sv },
-            // { info: apidata.info.sv ? (apidata.info.sv) : ('No info found...') },
-            // { level: apidata.level.sv },
+            { href: apidata.href.sv },
+            { courseWebUrl: apidata.courseWebUrl.sv },
+            { info: apidata.info.sv ? (apidata.info.sv) : ('No info found...') },
+            { level: apidata.level.sv },
             { score: result[0].score ? (result[0].score) : (noRating) },
             { comments: comments },
           ],
@@ -190,7 +208,8 @@ app.get('/kthapi/departments', (req, res) => {
   const requestURL = 'https://www.kth.se/api/kopps/v2/departments.sv.json';
   request(requestURL).then((response) => {
     res.json(response);
-  });
+  })
+  .catch((error) => error.toString());
 });
 
 // --
@@ -335,5 +354,39 @@ app.post('/user/reguser', jsonParser, (req, res) => {
     });
   }
 });
+
+function addslashes(str) {
+    return (str + '')
+      .replace(/[\\"']/g, '\\$&')
+      .replace(/\u0000/g, '\\0')
+      .replace(/\n\r?/g, '<br />');
+}
+
+app.post('/course/addcomment', jsonParser, (req, res) => {
+  const escapedText = addslashes(req.body.commentText);
+  const SQLquery = `START TRANSACTION;
+                    INSERT INTO comment (text)
+                      VALUES ('${ escapedText }');
+                    INSERT INTO course_comment (coursecomment_id, course_code, user_id) 
+                      VALUES (last_insert_id(), '${ req.body.courseCode }', ${ req.body.userId });
+                    COMMIT;`;
+  console.log(SQLquery);
+  connection.query(SQLquery, (err, result) => {
+    if (err) { console.log(err) }
+    console.log(JSON.stringify(result));
+    res.send({ commentId: result[1].insertId, courseCode: req.body.courseCode });
+  });
+});
+
+app.post('/course/removecomment', jsonParser, (req, res) => {
+  const escapedText = addslashes(req.body.commentText);
+  const SQLquery = ` DELETE FROM course_comment WHERE coursecomment_id = ${ req.body.commentId }`;
+  console.log(SQLquery);
+  connection.query(SQLquery, (err, result) => {
+    if (err) { console.log(err) }
+    res.send({ commentId: req.body.commentId });
+  });
+});
+
 
 app.listen(3000, () => console.log('server API listening on port 3000!'));
