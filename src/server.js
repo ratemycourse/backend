@@ -252,7 +252,7 @@ function checkValidUserInfo(name, email, pass1, pass2) {
 }
 
 app.post('/user/reguser', jsonParser, (req, res) => {
-  const [name, email, pass1, pass2, reg] = [req.body.newUser, req.body.newEmail, req.body.newPassword1, req.body.newPassword2, req.body.reg];
+  const [name, email, pass1, pass2, userid, reg] = [req.body.newUser, req.body.newEmail, req.body.newPassword1, req.body.newPassword2, req.body.userID, req.body.reg];
   let gotError = false;
   let errorMsg = checkValidUserInfo(name, email, pass1, pass2);
   if (errorMsg !== 'none') {
@@ -274,7 +274,7 @@ app.post('/user/reguser', jsonParser, (req, res) => {
     if (reg) {
       SQLgetID = 'SELECT LAST_INSERT_ID()';
     } else if (reg === false) {
-      SQLgetID = `SELECT user_id FROM user WHERE name = '${ name }'`;
+      SQLgetID = userid;
     }
     connection.query(SQLgetID, (getIDerr, getIDres) => {
       if (getIDerr) {
