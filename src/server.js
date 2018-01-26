@@ -196,136 +196,110 @@ function alphanum(inputtxt) {
 }
 
 function getSQLerrorMsg(SQLerror, name, email) {
-  const errorMessage = SQLerror.sqlMessage;
+  const SQLerrorMsg = SQLerror.sqlMessage;
   let errorMsg = 'no SQL-error';
-  if (errorMessage.includes('name_UNIQUE')) {
+  if (SQLerrorMsg.includes('name_UNIQUE')) {
     errorMsg = 'The user name ' + name + ' is already taken!';
-  } else if (errorMessage.includes('name_TOO_SHORT') || errorMessage.includes('name_TOO_LONG')) {
+  } else if (SQLerrorMsg.includes('name_TOO_SHORT') || SQLerrorMsg.includes('name_TOO_LONG')) {
     errorMsg = 'Your user name must be between 3 and 25 characters!';
-  } else if (errorMessage.includes('email_UNIQUE')) {
+  } else if (SQLerrorMsg.includes('email_UNIQUE')) {
     errorMsg = 'Another user is already registred with the email ' + email;
-  } else if (errorMessage.includes('email_INVALID')) {
+  } else if (SQLerrorMsg.includes('email_INVALID')) {
     errorMsg = email + ' is not a KTH-e-mail adress!';
-  } else if (errorMessage.includes('email_TOO_SHORT')) {
+  } else if (SQLerrorMsg.includes('email_TOO_SHORT')) {
     errorMsg = email + ' is not a valid e-mail adress';
-  } else if (errorMessage.includes('password_TOO_SHORT')) {
+  } else if (SQLerrorMsg.includes('password_TOO_SHORT')) {
     errorMsg = 'Your password has to be atleast 6 characters!';
-  } console.log(errorMsg);
+  }
   return errorMsg;
 }
 
-// TO DO : response.send() skicka felmeddelanden till front-end
-app.post('/user/reguser', jsonParser, (req, res) => {
-  const name = req.body.newUser;
-  const email = req.body.newEmail;
-  const pass1 = req.body.newPassword1;
-  const pass2 = req.body.newPassword2;
-  if (name === 'PURGE') { // REMOVE THIS STATEMENT AFTER DEVELOPMENT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    let SQLpurge = 'DELETE FROM user WHERE user_id > 0';
-    connection.query(SQLpurge);
-    SQLpurge = 'SELECT * FROM user';
-    connection.query(SQLpurge, (er, rs) => {
-      if (er) {
-        console.log(er);
-      } else {
-        console.log('-------user table: ', rs);
-      }
-    });
-    console.log('table user purged');
-  } else if (name === 'SELECT') { // REMOVE THIS STATEMENT AFTER DEVELOPMENT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    const SQLselect = 'SELECT * FROM user';
-    connection.query(SQLselect, (er, rs) => {
-      if (er) {
-        console.log(er);
-      } else {
-        console.log('-------user table: ', rs);
-      }
-    });
-    console.log('table user purged');
-  } else if (alphanum(name) === false) {
-    res.json({
-      reply: false,
-      data: null,
-      error: 'Your nick name can only contain letters and digits between A-Z / 0-9',
-    });
+function checkValidUserInfo(name, email, pass1, pass2) {
+  let errorMsg = 'none';
+  if (alphanum(name) === false) {
+    errorMsg = 'Your nick name can only contain letters and digits between A-Z / 0-9';
   } else if (pass1 !== pass2) {
-    res.json({
-      reply: false,
-      data: null,
-      error: 'Password fields doesn\'t match',
-    });
-  } else {
-    // försöker skriva till SQL-db
-    const SQLregister = `INSERT INTO user (name, email, password) VALUES ('${ name }', '${ email }', '${ pass1 }');`;
-    connection.query(SQLregister, (error) => {
-      if (error) {
-        // SQL gav ett error
-        const errorMsg = getSQLerrorMsg(error, name, email);
-        res.json({
-          reply: false,
-          data: null,
-          error: errorMsg,
-        });
-      } else {
-        const SQLgetID = 'SELECT LAST_INSERT_ID()';
-        connection.query(SQLgetID, (getIDerr, getIDres) => {
-          if (getIDerr) {
-            const getIDerrMsg = getIDerr.sqlMessage;
-            res.json({
-              reply: false,
-              data: null,
-              error: getIDerrMsg,
-            });
-          } else {
-            const userID = parseInt(JSON.stringify(getIDres[0]).replace(/\D/g, ''), 10);
-            const SQLgetData = `SELECT * FROM user WHERE user_id = ${ userID }`;
+    errorMsg = 'Password fields doesn\'t match';
+  }
+  return errorMsg;
+}
 
-            connection.query(SQLgetData, (getDataErr, resultData) => {
-              if (getDataErr) {
-                console.log('ERROR getting data from database!');
-              } else {
-                const scoreSeen = [];
-                const commentSeen = [];
-                const userScoresGiven = {};
-                const userComments = [];
-                for (const row of resultData) {
-                  if (!scoreSeen.includes(row.course_code) && row.course_code !== null) {
-                    userScoresGiven[row.course_code] = row.score_given;
-                    scoreSeen.push(row.course_code);
-                  }
-                  if (!commentSeen.includes(row.coursecomment_id) && row.coursecomment_id !== null) {
-                    userComments.push(row.coursecomment_id);
-                    commentSeen.push(row.coursecomment_id);
-                  }
-                }
-                const data = {
-                  userId: resultData[0].user_id,
-                  userName: resultData[0].name,
-                  userEmail: resultData[0].email,
-                  userScoresGiven: userScoresGiven,
-                  userComments: userComments,
-                };
-                res.json({
-                  reply: true,
-                  data: data,
-                  error: null,
-                });
-                console.log('(¯`·._.·(¯`·._.· Register success! ·._.·´¯)·._.·´¯) ');
-                /* console.log('   Name', name);
-                console.log('   E-mail', email);
-                console.log('   Password1', pass1);
-                console.log('   Password2', pass2);
-                console.log('   userID', userID);
-                const ciphertext = CryptoJS.AES.encrypt(pass1, 'secret key 123'); // chiper
-                const bytes = CryptoJS.AES.decrypt(ciphertext.toString(), 'secret key 123'); // conv to hex
-                const plaintext = bytes.toString(CryptoJS.enc.Utf8);  // dechiper */
+app.post('/user/reguser', jsonParser, (req, res) => {
+  const [name, email, pass1, pass2, reg] = [req.body.newUser, req.body.newEmail, req.body.newPassword1, req.body.newPassword2, req.body.reg];
+  let gotError = false;
+  let errorMsg = checkValidUserInfo(name, email, pass1, pass2);
+  if (errorMsg !== 'none') {
+    gotError = true;
+  }
+  let SQLquery = 'SELECT * FROM user WHERE user_id = 0';
+  if (reg && gotError === false) {
+    SQLquery = `INSERT INTO user (name, email, password) VALUES ('${ name }', '${ email }', '${ pass1 }');`;
+  } else if (reg === false && gotError === false) {
+    const CurrentUserID = req.body.userID;
+    SQLquery = `UPDATE user SET name = '${ name }', email = '${ email }', password = '${ pass1 }' WHERE user_id = ${ CurrentUserID }`;
+  }
+  connection.query(SQLquery, (SQLError) => {
+    if (SQLError) {
+      errorMsg = getSQLerrorMsg(SQLError, name, email);
+      gotError = true;
+    }
+    let SQLgetID;
+    if (reg) {
+      SQLgetID = 'SELECT LAST_INSERT_ID()';
+    } else if (reg === false) {
+      SQLgetID = `SELECT user_id FROM user WHERE name = '${ name }'`;
+    }
+    connection.query(SQLgetID, (getIDerr, getIDres) => {
+      if (getIDerr) {
+        errorMsg = getIDerr.sqlMessage;
+        gotError = true;
+      } else {
+        const userID = parseInt(JSON.stringify(getIDres[0]).replace(/\D/g, ''), 10);
+        const SQLgetData = `SELECT * FROM user WHERE user_id = ${ userID }`;
+        connection.query(SQLgetData, (getDataErr, resultData) => {
+          if (getDataErr) {
+            errorMsg = getDataErr.sqlMessage;
+            gotError = true;
+          } else {
+            const scoreSeen = [];
+            const commentSeen = [];
+            const userScoresGiven = {};
+            const userComments = [];
+            for (const row of resultData) {
+              if (!scoreSeen.includes(row.course_code) && row.course_code !== null) {
+                userScoresGiven[row.course_code] = row.score_given;
+                scoreSeen.push(row.course_code);
               }
-            });
+              if (!commentSeen.includes(row.coursecomment_id) && row.coursecomment_id !== null) {
+                userComments.push(row.coursecomment_id);
+                commentSeen.push(row.coursecomment_id);
+              }
+            }
+            if (gotError) {
+              res.json({
+                reply: false,
+                data: null,
+                error: errorMsg,
+              });
+            } else {
+              const data = {
+                userId: resultData[0].user_id,
+                userName: resultData[0].name,
+                userEmail: resultData[0].email,
+                userScoresGiven: userScoresGiven,
+                userComments: userComments,
+              };
+              res.json({
+                reply: true,
+                data: data,
+                error: null,
+              });
+            }
           }
         });
       }
     });
-  }
+  });
 });
 
 app.listen(3000, () => console.log('server API listening on port 3000!'));
