@@ -373,6 +373,16 @@ app.post('/course/addcomment', jsonParser, (req, res) => {
   });
 });
 
+app.post('/course/editcomment', jsonParser, (req, res) => {
+  const escapedText = addslashes(req.body.commentText);
+  const SQLquery = ` UPDATE comment SET text = '${ escapedText }' WHERE comment_id = ${ req.body.commentId }`;
+  console.log(SQLquery);
+  connection.query(SQLquery, (err, result) => {
+    if (err) { console.log(err) }
+    res.send(true);
+  });
+});
+
 app.post('/course/removecomment', jsonParser, (req, res) => {
   const escapedText = addslashes(req.body.commentText);
   const SQLquery = ` DELETE FROM course_comment WHERE coursecomment_id = ${ req.body.commentId }`;
@@ -382,6 +392,8 @@ app.post('/course/removecomment', jsonParser, (req, res) => {
     res.send({ commentId: req.body.commentId });
   });
 });
+
+
 
 
 app.listen(3000, () => console.log('server API listening on port 3000!'));
