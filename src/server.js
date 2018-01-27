@@ -292,7 +292,7 @@ function sendUserAlterResult(resultData, res, userid) {
 
 app.post('/user/reguser', jsonParser, (req, res) => {
   const [name, email, pass1, pass2, currentUserid, reg] = [req.body.newUser, req.body.newEmail, req.body.newPassword1, req.body.newPassword2, req.body.userID, req.body.reg];
-  console.log(name, email, pass1, pass2, currentUserid, reg);
+  console.log('name:', name, 'email:', email, 'pass1:', pass1, 'pass2:', pass2, 'currentUserid:', currentUserid, 'reg:', reg);
   let errorMsg = false;
   let SQLquery;
   let SQLgetID;
