@@ -268,13 +268,6 @@ function sendUserInsertResult(resultData, res) {
   });
 }
 
-function sendUserError(errorMsg, res) {
-  res.json({
-    reply: false,
-    data: null,
-    error: errorMsg,
-  });
-}
 
 function sendUserAlterResult(resultData, res, userid) {
   const data = {
@@ -289,10 +282,17 @@ function sendUserAlterResult(resultData, res, userid) {
   });
 }
 
+function sendUserError(errorMsg, res) {
+  res.json({
+    reply: false,
+    data: null,
+    error: errorMsg,
+  });
+}
 
 app.post('/user/reguser', jsonParser, (req, res) => {
   const [name, email, pass1, pass2, currentUserid, reg] = [req.body.newUser, req.body.newEmail, req.body.newPassword1, req.body.newPassword2, req.body.userID, req.body.reg];
-  console.log(name, email, pass1, pass2, currentUserid, reg);
+  console.log('name:', name, 'email:', email, 'pass1:', pass1, 'pass2:', pass2, 'currentUserid:', currentUserid, 'reg:', reg);
   let errorMsg = false;
   let SQLquery;
   let SQLgetID;
@@ -325,23 +325,29 @@ app.post('/user/reguser', jsonParser, (req, res) => {
         }
       });
     } else {
-      SQLquery = `UPDATE user SET name = '${ name }', email = '${ email }', password = '${ pass1 }' WHERE user_id = ${ currentUserid }`;
-      connection.query(SQLquery, (SQLError) => {
-        if (SQLError) {
-          errorMsg = getSQLerrorMsg(SQLError, name, email);
-          sendUserError(errorMsg, res);
-        } else {
-          const SQLgetData = `SELECT * FROM user WHERE user_id = ${ currentUserid }`;
-          connection.query(SQLgetData, (getDataErr, resultData) => {
-            if (getDataErr) {
-              errorMsg = getDataErr.sqlMessage;
-              sendUserError(errorMsg, res);
-            } else {
-              sendUserAlterResult(resultData, res, currentUserid);
-            }
-          });
-        }
-      });
+      if (pass1 === false) {
+        errorMsg = 'Please fill out the password fields';
+        console.log(errorMsg);
+        sendUserError(errorMsg, res);
+      } else {
+        SQLquery = `UPDATE user SET name = '${ name }', email = '${ email }', password = '${ pass1 }' WHERE user_id = ${ currentUserid }`;
+        connection.query(SQLquery, (SQLError) => {
+          if (SQLError) {
+            errorMsg = getSQLerrorMsg(SQLError, name, email);
+            sendUserError(errorMsg, res);
+          } else {
+            const SQLgetData = `SELECT * FROM user WHERE user_id = ${ currentUserid }`;
+            connection.query(SQLgetData, (getDataErr, resultData) => {
+              if (getDataErr) {
+                errorMsg = getDataErr.sqlMessage;
+                sendUserError(errorMsg, res);
+              } else {
+                sendUserAlterResult(resultData, res, currentUserid);
+              }
+            });
+          }
+        });
+      }
     }
   } else {
     errorMsg = 'Password fields doesn\'t match';
