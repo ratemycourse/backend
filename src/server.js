@@ -100,7 +100,7 @@ app.get('/search/query', (req, res) => {
   });
 });
 
-app.get('/course/:courseCode', async (req, res) => {
+app.get('/course/:courseCode', async(req, res) => {
   const noRating = 'No rating';
   const requestURL = `https://www.kth.se/api/kopps/v2/course/${ req.params.courseCode }`;
 
@@ -214,13 +214,6 @@ app.get('/kthapi/departments', (req, res) => {
 
 // --
 
-function alphanum(inputtxt) {
-  const letterNumber = /^[0-9a-zA-Z]+$/;
-  if (inputtxt.match(letterNumber)) {
-    return true;
-  }
-  return false;
-}
 
 function getSQLerrorMsg(SQLerror, name, email) {
   const SQLerrorMsg = SQLerror.sqlMessage;
@@ -237,103 +230,131 @@ function getSQLerrorMsg(SQLerror, name, email) {
     errorMsg = email + ' is not a valid e-mail adress';
   } else if (SQLerrorMsg.includes('password_TOO_SHORT')) {
     errorMsg = 'Your password has to be atleast 6 characters!';
+  } else if (SQLerrorMsg.includes('password_TOO_LONG')) {
+    errorMsg = 'Your password can not be larger than 48 characters!';
+  } else if (SQLerrorMsg.includes('name_NONE_ALPHANUM')) {
+    errorMsg = 'Your nick name can only contain letters and digits between A-Z / 0-9';
   }
   return errorMsg;
 }
 
-function checkValidUserInfo(name, email, pass1, pass2) {
-  let errorMsg = 'none';
-  if (alphanum(name) === false) {
-    errorMsg = 'Your nick name can only contain letters and digits between A-Z / 0-9';
-  } else if (pass1 !== pass2) {
-    errorMsg = 'Password fields doesn\'t match';
+
+function sendUserInsertResult(resultData, res) {
+  const scoreSeen = [];
+  const commentSeen = [];
+  const userScoresGiven = {};
+  const userComments = [];
+  for (const row of resultData) {
+    if (!scoreSeen.includes(row.course_code) && row.course_code !== null) {
+      userScoresGiven[row.course_code] = row.score_given;
+      scoreSeen.push(row.course_code);
+    }
+    if (!commentSeen.includes(row.coursecomment_id) && row.coursecomment_id !== null) {
+      userComments.push(row.coursecomment_id);
+      commentSeen.push(row.coursecomment_id);
+    }
   }
-  return errorMsg;
+  const data = {
+    userId: resultData[0].user_id,
+    userName: resultData[0].name,
+    userEmail: resultData[0].email,
+    userScoresGiven: userScoresGiven,
+    userComments: userComments,
+  };
+  res.json({
+    reply: true,
+    data: data,
+    error: null,
+  });
 }
+
+function sendUserError(errorMsg, res) {
+  res.json({
+    reply: false,
+    data: null,
+    error: errorMsg,
+  });
+}
+
+function sendUserAlterResult(resultData, res, userid) {
+  const data = {
+    userId: userid,
+    userName: resultData[0].name,
+    userEmail: resultData[0].email,
+  };
+  res.json({
+    reply: true,
+    data: data,
+    error: null,
+  });
+}
+
 
 app.post('/user/reguser', jsonParser, (req, res) => {
-  const [name, email, pass1, pass2, userid, reg] = [req.body.newUser, req.body.newEmail, req.body.newPassword1, req.body.newPassword2, req.body.userID, req.body.reg];
-  let gotError = false;
-  let errorMsg = checkValidUserInfo(name, email, pass1, pass2);
-  if (errorMsg !== 'none') {
-    gotError = true;
-  }
-  let SQLquery = 'SELECT * FROM user WHERE user_id = 0';
-  if (reg && gotError === false) {
-    SQLquery = `INSERT INTO user (name, email, password) VALUES ('${ name }', '${ email }', '${ pass1 }');`;
-  } else if (reg === false && gotError === false) {
-    const CurrentUserID = req.body.userID;
-    SQLquery = `UPDATE user SET name = '${ name }', email = '${ email }', password = '${ pass1 }' WHERE user_id = ${ CurrentUserID }`;
-  }
-  connection.query(SQLquery, (SQLError) => {
-    if (SQLError) {
-      errorMsg = getSQLerrorMsg(SQLError, name, email);
-      gotError = true;
-    }
-    let SQLgetID;
+  const [name, email, pass1, pass2, currentUserid, reg] = [req.body.newUser, req.body.newEmail, req.body.newPassword1, req.body.newPassword2, req.body.userID, req.body.reg];
+  console.log(name, email, pass1, pass2, currentUserid, reg);
+  let errorMsg = false;
+  let SQLquery;
+  let SQLgetID;
+  if (pass1 === pass2) {
     if (reg) {
-      SQLgetID = 'SELECT LAST_INSERT_ID()';
-    } else if (reg === false) {
-      SQLgetID = userid;
-    }
-    connection.query(SQLgetID, (getIDerr, getIDres) => {
-      if (getIDerr) {
-        errorMsg = getIDerr.sqlMessage;
-        gotError = true;
-      } else {
-        const userID = parseInt(JSON.stringify(getIDres[0]).replace(/\D/g, ''), 10);
-        const SQLgetData = `SELECT * FROM user WHERE user_id = ${ userID }`;
-        connection.query(SQLgetData, (getDataErr, resultData) => {
-          if (getDataErr) {
-            errorMsg = getDataErr.sqlMessage;
-            gotError = true;
-          } else {
-            const scoreSeen = [];
-            const commentSeen = [];
-            const userScoresGiven = {};
-            const userComments = [];
-            for (const row of resultData) {
-              if (!scoreSeen.includes(row.course_code) && row.course_code !== null) {
-                userScoresGiven[row.course_code] = row.score_given;
-                scoreSeen.push(row.course_code);
-              }
-              if (!commentSeen.includes(row.coursecomment_id) && row.coursecomment_id !== null) {
-                userComments.push(row.coursecomment_id);
-                commentSeen.push(row.coursecomment_id);
-              }
-            }
-            if (gotError) {
-              res.json({
-                reply: false,
-                data: null,
-                error: errorMsg,
-              });
+      SQLquery = `INSERT INTO user (name, email, password) VALUES ('${ name }', '${ email }', '${ pass1 }');`;
+      connection.query(SQLquery, (SQLError) => {
+        if (SQLError) {
+          errorMsg = getSQLerrorMsg(SQLError, name, email);
+          sendUserError(errorMsg, res);
+        } else {
+          SQLgetID = 'SELECT LAST_INSERT_ID()';
+          connection.query(SQLgetID, (getIDerr, getIDres) => {
+            if (getIDerr) {
+              errorMsg = getIDerr.sqlMessage;
+              sendUserError(errorMsg, res);
             } else {
-              const data = {
-                userId: resultData[0].user_id,
-                userName: resultData[0].name,
-                userEmail: resultData[0].email,
-                userScoresGiven: userScoresGiven,
-                userComments: userComments,
-              };
-              res.json({
-                reply: true,
-                data: data,
-                error: null,
+              const newUserid = parseInt(JSON.stringify(getIDres[0]).replace(/\D/g, ''), 10);
+              const SQLgetData = `SELECT * FROM user WHERE user_id = ${ newUserid }`;
+              connection.query(SQLgetData, (getDataErr, resultData) => {
+                if (getDataErr) {
+                  errorMsg = getDataErr.sqlMessage;
+                  sendUserError(errorMsg, res);
+                } else {
+                  sendUserInsertResult(resultData, res);
+                }
               });
             }
-          }
-        });
-      }
-    });
-  });
+          });
+        }
+      });
+    } else {
+      SQLquery = `UPDATE user SET name = '${ name }', email = '${ email }', password = '${ pass1 }' WHERE user_id = ${ currentUserid }`;
+      connection.query(SQLquery, (SQLError) => {
+        if (SQLError) {
+          errorMsg = getSQLerrorMsg(SQLError, name, email);
+          sendUserError(errorMsg, res);
+        } else {
+          const SQLgetData = `SELECT * FROM user WHERE user_id = ${ currentUserid }`;
+          connection.query(SQLgetData, (getDataErr, resultData) => {
+            if (getDataErr) {
+              errorMsg = getDataErr.sqlMessage;
+              sendUserError(errorMsg, res);
+            } else {
+              sendUserAlterResult(resultData, res, currentUserid);
+            }
+          });
+        }
+      });
+    }
+  } else {
+    errorMsg = 'Password fields doesn\'t match';
+    sendUserError(errorMsg, res);
+  }
 });
 
+
 function addslashes(str) {
-    return (str + '')
-      .replace(/[\\"']/g, '\\$&')
-      .replace(/\u0000/g, '\\0')
-      .replace(/\n\r?/g, '<br />');
+  return (str + '')
+  .replace(/[\\"']/g, '\\$&')
+  .replace(/\u0000/g, '\\0')
+  .replace(/\n\r?/g, '<br />');
 }
 
 app.post('/course/addcomment', jsonParser, (req, res) => {
