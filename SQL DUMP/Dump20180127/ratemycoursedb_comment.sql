@@ -2,7 +2,7 @@
 --
 -- Host: 127.0.0.1    Database: ratemycoursedb
 -- ------------------------------------------------------
--- Server version	5.7.20-log
+-- Server version	5.7.21-log
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -16,30 +16,28 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
--- Table structure for table `scores`
+-- Table structure for table `comment`
 --
 
-DROP TABLE IF EXISTS `scores`;
+DROP TABLE IF EXISTS `comment`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `scores` (
-  `course_code` varchar(6) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `score_given` int(11) DEFAULT NULL,
-  PRIMARY KEY (`course_code`),
-  KEY `FK_scores_userID_idx` (`user_id`),
-  CONSTRAINT `FK_scores_coursecode` FOREIGN KEY (`course_code`) REFERENCES `course` (`code`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  CONSTRAINT `FK_scores_userID` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TABLE `comment` (
+  `comment_id` int(10) NOT NULL AUTO_INCREMENT,
+  `text` varchar(1000) DEFAULT NULL,
+  `timeCreated` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`comment_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `scores`
+-- Dumping data for table `comment`
 --
 
-LOCK TABLES `scores` WRITE;
-/*!40000 ALTER TABLE `scores` DISABLE KEYS */;
-/*!40000 ALTER TABLE `scores` ENABLE KEYS */;
+LOCK TABLES `comment` WRITE;
+/*!40000 ALTER TABLE `comment` DISABLE KEYS */;
+INSERT INTO `comment` VALUES (4,'Detta är en kommentar','2018-01-14 13:09:27'),(5,'Poop :(','2018-01-26 16:40:47');
+/*!40000 ALTER TABLE `comment` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -51,4 +49,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2018-01-15 16:52:38
+-- Dump completed on 2018-01-27 11:23:18
