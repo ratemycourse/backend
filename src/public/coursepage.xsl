@@ -135,29 +135,28 @@
     </xsl:template>
 
     <xsl:template match="commentText">
-      <div class="commentCard bg-white mt-2 mb-2 ml-5 mr-5 rounded">
+      <div  class="commentCard bg-white rounded mt-2 mb-0 ml-5 mr-5 p-5">
       <xsl:attribute name="userId">
         <xsl:value-of select="../userID"/>
       </xsl:attribute>
-      <xsl:attribute name="commentId">
+      <xsl:attribute name="id">
         <xsl:value-of select="../commentId"/>
       </xsl:attribute>
-        <div class="pb-0 pr-5 pl-5 pt-5">
           <div class="col">
             <div class="row">
               <div class="mr-1 font-weight-bold text-secondary"><xsl:value-of select="../userName"/></div>
               commented:
             </div>
             <div class="row p-1">
-              <xsl:value-of select="current()" disable-output-escaping="yes"/>
+              <div class="commentText">
+                <xsl:value-of select="current()" disable-output-escaping="yes"/>
+              </div>
               <div class="font-italic font-weight-bold text-tetriary mt-3 ml-auto">
                <xsl:value-of select="../timeCreated"/>
               </div>
             </div>
           </div>
-        </div>
-        <div class="editButtons">Edit buttons</div>
+        <div class="editButtons" style="position: absolute; right: 105px;">Edit buttons</div>
       </div>
     </xsl:template>
 </xsl:stylesheet>
-
