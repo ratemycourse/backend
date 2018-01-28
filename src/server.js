@@ -67,12 +67,14 @@ app.get('/buildDB', (req, res) => {
 
 app.get('/search/query', (req, res) => {
   const noRating = 'No rating';
+  console.log(req.query);
   let SQLquery = `SELECT code, name, score, href, depcode, count(coursecomment_id) as sumComments FROM course
                   LEFT JOIN course_comment ON course.code = course_comment.course_code
                      WHERE ( code LIKE '%${ req.query.srchstr }%' 
                      OR name LIKE '%${ req.query.srchstr }%') 
                      AND depcode IN (${ req.query.dep })
-                     GROUP BY code`;
+                     GROUP BY code
+                     ORDER BY ${ req.query.order ? req.query.order : 'name ASC' }`;
 
   if (req.query.srchstr === 'empty') {
     SQLquery = `SELECT * FROM course WHERE depcode IN (${ req.query.dep })`;
@@ -268,6 +270,13 @@ function sendUserInsertResult(resultData, res) {
   });
 }
 
+function sendUserError(errorMsg, res) {
+  res.json({
+    reply: false,
+    data: null,
+    error: errorMsg,
+  });
+}
 
 function sendUserAlterResult(resultData, res, userid) {
   const data = {
@@ -282,17 +291,10 @@ function sendUserAlterResult(resultData, res, userid) {
   });
 }
 
-function sendUserError(errorMsg, res) {
-  res.json({
-    reply: false,
-    data: null,
-    error: errorMsg,
-  });
-}
 
 app.post('/user/reguser', jsonParser, (req, res) => {
   const [name, email, pass1, pass2, currentUserid, reg] = [req.body.newUser, req.body.newEmail, req.body.newPassword1, req.body.newPassword2, req.body.userID, req.body.reg];
-  console.log('name:', name, 'email:', email, 'pass1:', pass1, 'pass2:', pass2, 'currentUserid:', currentUserid, 'reg:', reg);
+  console.log(name, email, pass1, pass2, currentUserid, reg);
   let errorMsg = false;
   let SQLquery;
   let SQLgetID;
@@ -325,29 +327,23 @@ app.post('/user/reguser', jsonParser, (req, res) => {
         }
       });
     } else {
-      if (pass1 === false) {
-        errorMsg = 'Please fill out the password fields';
-        console.log(errorMsg);
-        sendUserError(errorMsg, res);
-      } else {
-        SQLquery = `UPDATE user SET name = '${ name }', email = '${ email }', password = '${ pass1 }' WHERE user_id = ${ currentUserid }`;
-        connection.query(SQLquery, (SQLError) => {
-          if (SQLError) {
-            errorMsg = getSQLerrorMsg(SQLError, name, email);
-            sendUserError(errorMsg, res);
-          } else {
-            const SQLgetData = `SELECT * FROM user WHERE user_id = ${ currentUserid }`;
-            connection.query(SQLgetData, (getDataErr, resultData) => {
-              if (getDataErr) {
-                errorMsg = getDataErr.sqlMessage;
-                sendUserError(errorMsg, res);
-              } else {
-                sendUserAlterResult(resultData, res, currentUserid);
-              }
-            });
-          }
-        });
-      }
+      SQLquery = `UPDATE user SET name = '${ name }', email = '${ email }', password = '${ pass1 }' WHERE user_id = ${ currentUserid }`;
+      connection.query(SQLquery, (SQLError) => {
+        if (SQLError) {
+          errorMsg = getSQLerrorMsg(SQLError, name, email);
+          sendUserError(errorMsg, res);
+        } else {
+          const SQLgetData = `SELECT * FROM user WHERE user_id = ${ currentUserid }`;
+          connection.query(SQLgetData, (getDataErr, resultData) => {
+            if (getDataErr) {
+              errorMsg = getDataErr.sqlMessage;
+              sendUserError(errorMsg, res);
+            } else {
+              sendUserAlterResult(resultData, res, currentUserid);
+            }
+          });
+        }
+      });
     }
   } else {
     errorMsg = 'Password fields doesn\'t match';
